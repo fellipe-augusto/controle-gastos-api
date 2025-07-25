@@ -16,6 +16,18 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// =================================================================
+// INÍCIO DO CÓDIGO DE DEBUG - "DEDO-DURO"
+// Este middleware vai registrar toda requisição que chegar no servidor
+app.use((req, res, next) => {
+  console.log(
+    `[${new Date().toISOString()}] Recebida requisição: ${req.method} ${req.originalUrl}`
+  );
+  next(); // Continua para a próxima rota
+});
+// FIM DO CÓDIGO DE DEBUG
+// =================================================================
+
 // Rotas públicas
 app.use('/api/auth', authRoutes);
 
