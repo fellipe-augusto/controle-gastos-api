@@ -10,7 +10,7 @@ const app = express();
 
 // Configure o CORS de forma mais explícita
 const corsOptions = {
-  origin: 'https://controle-gastos-ui.vercel.app', // Substitua pela URL da Vercel
+  origin: 'https://app-controle-de-gastos-fellipe.vercel.app/', // Substitua pela URL da Vercel
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
