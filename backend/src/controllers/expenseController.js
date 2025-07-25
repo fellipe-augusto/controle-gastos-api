@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { addMonths } = require('date-fns');
+const { addMonths, startOfMonth, endOfMonth } = require('date-fns');
 const { randomUUID } = require('crypto');
 const prisma = new PrismaClient();
 
@@ -12,27 +12,25 @@ exports.createExpense = async (req, res) => {
   }
 
   try {
-    const card = await prisma.card.findFirst({ where: { id: cardId, userId: userId }});
+    const card = await prisma.card.findFirst({ where: { id: cardId, userId: userId } });
     if (!card) {
-      return res.status(404).json({ error: "Cartão não encontrado ou não pertence ao usuário."});
+      return res.status(404).json({ error: "Cartão não encontrado ou não pertence ao usuário." });
     }
 
     const purchaseId = randomUUID();
-    const purchaseDate = new Date(date); // Armazena a data da compra
+    const purchaseDate = new Date(date);
     const expenseAmount = parseFloat(amount) / totalInstallments;
 
     for (let i = 1; i <= totalInstallments; i++) {
-      const installmentDescription = totalInstallments > 1 ? `${description} (${i}/${totalInstallments})` : description;
-      
-      // CALCULA A DATA DE COMPETÊNCIA DE CADA PARCELA
+      const installmentDescription = description;
       const dueDate = addMonths(purchaseDate, i - 1);
 
       await prisma.expense.create({
         data: {
           description: installmentDescription,
           amount: expenseAmount,
-          date: purchaseDate, // A data da compra original é a mesma para todas as parcelas
-          dueDate: dueDate,  // A data de competência muda a cada mês
+          date: purchaseDate,
+          dueDate: dueDate,
           installment: i,
           totalInstallments: parseInt(totalInstallments),
           responsible: responsible,
@@ -48,17 +46,14 @@ exports.createExpense = async (req, res) => {
   }
 };
 
-const { startOfMonth, endOfMonth, parseISO } = require('date-fns');
-
 exports.getExpenses = async (req, res) => {
   const { year, month, cardId, responsible } = req.query;
-  const loggedInUser = req.user; // Pega o usuário logado
+  const loggedInUser = req.user;
 
   if (!year || !month) {
-    return res.status(400).json({ error: 'Ano e mês são obrigatórios.'});
+    return res.status(400).json({ error: 'Ano e mês são obrigatórios.' });
   }
 
-  // Cria as datas de início e fim do mês solicitado
   const startDate = startOfMonth(new Date(parseInt(year), parseInt(month) - 1));
   const endDate = endOfMonth(startDate);
 
@@ -72,19 +67,17 @@ exports.getExpenses = async (req, res) => {
   if (cardId) {
     whereClause.cardId = cardId;
   }
+  
   if (loggedInUser.role === 'ADMIN') {
-    // Se for ADMIN e um responsável foi selecionado no filtro, adicione ao 'where'
     if (responsible) {
       whereClause.responsible = responsible;
     }
   } else {
-    // Se for USER, ignore o filtro 'responsible' e force a busca apenas pelo nome dele
     whereClause.responsible = loggedInUser.name;
   }
 
   try {
     const expenses = await prisma.expense.findMany({
-      // 4. A cláusula 'where' agora é dinâmica e NÃO TEM MAIS O FILTRO DE USUÁRIO
       where: whereClause,
       include: {
         card: true
@@ -102,16 +95,14 @@ exports.updateExpense = async (req, res) => {
   const { description, amount, date, responsible } = req.body;
   
   try {
-    // Primeiro, verifica se a despesa pertence ao usuário logado
-    const expense = await prisma.expense.findFirst({
-      where: { id, card: { userId: req.user.id } },
+    const expense = await prisma.expense.findUnique({
+      where: { id },
     });
 
     if (!expense) {
-      return res.status(404).json({ error: 'Despesa não encontrada ou não autorizada.' });
+      return res.status(404).json({ error: 'Despesa não encontrada.' });
     }
     
-    // Atualiza a despesa
     const updatedExpense = await prisma.expense.update({
       where: { id },
       data: { description, amount, date: new Date(date), responsible },
@@ -127,19 +118,17 @@ exports.deleteExpense = async (req, res) => {
   const { id } = req.params;
   
   try {
-    const expense = await prisma.expense.findFirst({
-      where: { id, card: { userId: req.user.id } },
+    const expense = await prisma.expense.findUnique({
+      where: { id },
     });
 
     if (!expense) {
-      return res.status(404).json({ error: 'Despesa não encontrada ou não autorizada.' });
+      return res.status(404).json({ error: 'Despesa não encontrada.' });
     }
     
-    // LÓGICA IMPORTANTE: Excluir todas as parcelas da mesma compra.
     await prisma.expense.deleteMany({
       where: {
-        purchaseId: expense.purchaseId, // Usa o ID da compra para encontrar todas as parcelas
-        card: { userId: req.user.id }, // Segurança extra
+        purchaseId: expense.purchaseId,
       },
     });
     
@@ -152,7 +141,6 @@ exports.deleteExpense = async (req, res) => {
 exports.getResponsibles = async (req, res) => {
   try {
     if (req.user.role === 'ADMIN') {
-      // Se for ADMIN, busca todos os responsáveis únicos no banco
       const responsibles = await prisma.expense.findMany({
         select: {
           responsible: true,
@@ -161,7 +149,6 @@ exports.getResponsibles = async (req, res) => {
       });
       res.json(responsibles.map(r => r.responsible));
     } else {
-      // Se for USER, retorna apenas o próprio nome
       res.json([req.user.name]);
     }
   } catch (error) {

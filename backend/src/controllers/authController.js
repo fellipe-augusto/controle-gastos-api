@@ -8,22 +8,20 @@ const generateToken = (id) => {
 };
 
 exports.registerUser = async (req, res) => {
-  // Agora recebemos 'name', 'email' e 'password'
-  const { name, email, password } = req.body; 
+  const { name, email, password } = req.body;
 
-  if (!name) { // Adiciona uma validação simples
+  if (!name) {
     return res.status(400).json({ error: 'O nome é obrigatório.' });
   }
 
   const userCount = await prisma.user.count();
-
   const role = userCount === 0 ? 'ADMIN' : 'USER';
 
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
   try {
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role }, 
+      data: { name, email, password: hashedPassword, role },
     });
     res.status(201).json({ token: generateToken(user.id) });
   } catch (error) {

@@ -15,24 +15,18 @@ exports.createCard = async (req, res) => {
 
 exports.getCards = async (req, res) => {
   try {
-    // LÓGICA DE PERMISSÃO
     if (req.user.role === 'ADMIN') {
-      // Se for ADMIN, busca todos os cartões
-      const cards = await prisma.card.findMany(); 
+      const cards = await prisma.card.findMany();
       res.json(cards);
     } else {
-      // Se for USER, a lógica é mais complexa:
-      // 1. Encontre todas as despesas do usuário
       const userExpenses = await prisma.expense.findMany({
         where: { responsible: req.user.name },
-        select: { cardId: true }, // Pega apenas o ID do cartão
-        distinct: ['cardId'],    // Pega apenas IDs únicos
+        select: { cardId: true },
+        distinct: ['cardId'],
       });
 
-      // 2. Extrai os IDs dos cartões para um array
       const cardIds = userExpenses.map(expense => expense.cardId);
 
-      // 3. Busca apenas os cartões que correspondem a esses IDs
       const cards = await prisma.card.findMany({
         where: {
           id: {
@@ -48,11 +42,10 @@ exports.getCards = async (req, res) => {
 };
 
 exports.deleteCard = async (req, res) => {
-  const { id } = req.params; // Pega o ID do cartão da URL
+  const { id } = req.params;
   const userId = req.user.id;
 
   try {
-    // Verifica se o cartão existe e pertence ao usuário logado
     const card = await prisma.card.findFirst({
       where: { id, userId },
     });
@@ -61,7 +54,6 @@ exports.deleteCard = async (req, res) => {
       return res.status(404).json({ error: 'Cartão não encontrado ou não autorizado.' });
     }
 
-    // Pro-tip: Futuramente, adicionar uma verificação se o cartão possui despesas antes de excluir.
     await prisma.card.delete({
       where: { id },
     });

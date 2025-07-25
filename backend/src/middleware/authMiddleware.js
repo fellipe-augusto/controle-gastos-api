@@ -8,12 +8,19 @@ exports.protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
       req.user = await prisma.user.findUnique({ where: { id: decoded.id } });
+      
+      if (!req.user) {
+        return res.status(401).json({ error: 'Não autorizado, usuário não encontrado' });
+      }
+      
       next();
     } catch (error) {
-      res.status(401).json({ error: 'Não autorizado, token falhou' });
+      return res.status(401).json({ error: 'Não autorizado, token falhou' });
     }
   }
+
   if (!token) {
     res.status(401).json({ error: 'Não autorizado, sem token' });
   }
