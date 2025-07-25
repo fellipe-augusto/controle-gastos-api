@@ -5,7 +5,8 @@ const {
   getExpenses, 
   updateExpense, 
   deleteExpense, 
-  getResponsibles 
+  getResponsibles,
+  getExpenseSummary 
 } = require('../controllers/expenseController');
 const { protect } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/adminOnly');
@@ -20,5 +21,7 @@ router.route('/responsibles')
 router.route('/:id')
   .put(protect, adminOnly, updateExpense)
   .delete(protect, adminOnly, deleteExpense);
+
+router.route('/summary').get(protect, getExpenseSummary);
 
 module.exports = router;

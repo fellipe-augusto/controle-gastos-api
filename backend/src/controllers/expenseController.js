@@ -90,6 +90,69 @@ exports.getExpenses = async (req, res) => {
   }
 };
 
+exports.getExpenseSummary = async (req, res) => {
+  const { year, month } = req.query;
+  const loggedInUser = req.user;
+
+  if (!year || !month) {
+    return res.status(400).json({ error: 'Ano e mês são obrigatórios.' });
+  }
+
+  const startDate = startOfMonth(new Date(parseInt(year), parseInt(month) - 1));
+  const endDate = endOfMonth(startDate);
+
+  // Cláusula de filtro base, respeitando a permissão do usuário
+  const whereClause = {
+    dueDate: { gte: startDate, lte: endDate },
+    ...(loggedInUser.role !== 'ADMIN' && { responsible: loggedInUser.name }),
+  };
+
+  try {
+    // 1. Calcular totais e contagem
+    const totals = await prisma.expense.aggregate({
+      _sum: { amount: true },
+      _count: { id: true },
+      where: whereClause,
+    });
+
+    // 2. Agrupar gastos por responsável
+    const byResponsible = await prisma.expense.groupBy({
+      by: ['responsible'],
+      _sum: { amount: true },
+      where: whereClause,
+      orderBy: { _sum: { amount: 'desc' } },
+    });
+
+    // 3. Agrupar gastos por cartão
+    const byCard = await prisma.expense.groupBy({
+      by: ['cardId'],
+      _sum: { amount: true },
+      where: whereClause,
+    });
+    
+    // Precisamos buscar os nomes dos cartões para o resultado de 'byCard'
+    const cardIds = byCard.map(item => item.cardId);
+    const cards = await prisma.card.findMany({ where: { id: { in: cardIds } } });
+    const cardMap = new Map(cards.map(card => [card.id, card.name]));
+
+    const spendingByCard = byCard.map(item => ({
+      cardName: cardMap.get(item.cardId) || 'Desconhecido',
+      total: item._sum.amount,
+    })).sort((a, b) => b.total - a.total);
+    
+    res.json({
+      totalAmount: totals._sum.amount || 0,
+      expenseCount: totals._count.id || 0,
+      spendingByResponsible: byResponsible.map(item => ({ responsible: item.responsible, total: item._sum.amount })),
+      spendingByCard: spendingByCard,
+    });
+
+  } catch (error) {
+    console.error("Erro ao gerar resumo", error);
+    res.status(500).json({ error: "Não foi possível gerar o resumo." });
+  }
+};
+
 exports.updateExpense = async (req, res) => {
   const { id } = req.params;
   const { description, amount, date, responsible } = req.body;
