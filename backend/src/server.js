@@ -8,7 +8,12 @@ const { protect } = require('./middleware/authMiddleware');
 
 const app = express();
 
-app.use(cors());
+// Configure o CORS de forma mais explícita
+const corsOptions = {
+  origin: 'https://controle-gastos-ui.vercel.app', // Substitua pela URL da Vercel
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Rotas públicas
